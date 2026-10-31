@@ -42,21 +42,22 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 
-# Reproduce the development comparison (optional; does not inspect October).
-python experiment.py
+# Train, score both CSVs, and build the report.
+python run.py
 
-# Evaluate the fixed selection on October, run a two-month horizon check,
-# refit all labeled rows, save the model and fill both output CSVs.
-python train.py
-
-# Run the supplied, unchanged scorer.
-python score.py --predictions validation_predictions.csv --december-predictions data/december_chart_inputs.csv
-
-# Rebuild the PDF from the saved results and scorer-generated chart.
-python make_report.py
-
-# Contract checks.
+# Tests use small fixtures; no assessment data needed.
 python -m unittest discover -s tests -v
+```
+
+`run.py` runs `train.py`, the unchanged `score.py`, and `make_report.py` in order,
+stopping on any failure. Training includes the October evaluation, a two-month
+horizon check, and the final refit. To reproduce the original model comparison,
+run `python experiment.py`; it uses only January-September.
+
+The provided scorer can also be run directly:
+
+```bash
+python score.py --predictions validation_predictions.csv --december-predictions data/december_chart_inputs.csv
 ```
 
 For the exact tested versions, install `requirements.lock.txt` instead. On a different
@@ -64,6 +65,16 @@ operating system, pip selects its compatible wheels. CatBoost training uses four
 threads, a fixed seed and 1,600 iterations; small platform-level numeric differences
 are possible. No external services, external datasets or API credentials are needed.
 The generated model is ignored by Git and recreated by `train.py`.
+
+For development checks:
+
+```bash
+python -m pip install -r requirements-dev.txt
+ruff check .
+ruff format --check .
+```
+
+The formatter and linter exclude the supplied `score.py` to preserve it exactly.
 
 To predict again without retraining:
 
@@ -126,6 +137,21 @@ predictions; `scorer_results/candidate_december.png` is the original scorer's ch
 `results/october_slices.csv` preserve aggregate evidence. Running `train.py` also
 writes a local-only October prediction ledger, excluded from the public repository.
 `results/input_sha256.json` fingerprints immutable model inputs and the original scorer.
+
+## Code map
+
+| File | Purpose |
+| --- | --- |
+| `run.py` | Complete submission workflow |
+| `freight_model.py` | Input checks, train-only features, estimators |
+| `evaluation.py` | Metrics, date splits, error summaries |
+| `train.py` | Fixed-model evaluation and final training |
+| `predict.py` | Saved-model inference and ID matching |
+| `experiment.py` | Development comparisons |
+| `make_report.py` | Report from saved results and scorer chart |
+
+Test fixtures cover ID matching, invalid inputs, training-only imputation, signal exclusion,
+time boundaries, and scorer rejection. Public CI runs lint, formatting and tests.
 
 ## Limits
 

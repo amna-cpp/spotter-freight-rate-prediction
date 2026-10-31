@@ -1,116 +1,157 @@
-"""Evaluate the locked model on October; refit all labeled data and predict."""
+"""Evaluate the fixed model, refit all labels, and write submission predictions."""
+
 from __future__ import annotations
+
 import argparse
 import hashlib
 import json
 from pathlib import Path
+
 import joblib
 import numpy as np
 import pandas as pd
-from experiment import metrics
-from freight_model import TreeRateModel
-from predict import predict_files
+
+from evaluation import (
+    audit,
+    day_bootstrap_interval,
+    error_slices,
+    metrics,
+    split_before,
+)
+from freight_model import ITERATIONS, SEED, TreeRateModel, validate_features
+from predict import validate_ids, write_predictions
 
 
-def day_bootstrap_interval(frame, predictions):
-    errors = pd.DataFrame({'date':frame.date.to_numpy(),
-                           'error':np.abs(frame.posted_rate.to_numpy()-predictions)})
-    by_day = errors.groupby('date').error.agg(['sum','count'])
-    rng = np.random.default_rng(42)
-    indices = rng.integers(0,len(by_day),size=(2000,len(by_day)))
-    values = by_day['sum'].to_numpy()[indices].sum(axis=1)/by_day['count'].to_numpy()[indices].sum(axis=1)
-    return np.quantile(values,[.025,.975]).tolist()
+def load_inputs(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
+    labeled = pd.read_csv(data_dir / "train_test.csv")
+    validation = pd.read_csv(data_dir / "validation.csv")
+    for label, frame in [("training", labeled), ("validation", validation)]:
+        validate_features(frame, label)
+        validate_ids(frame, label)
+        frame["distance"] = pd.to_numeric(frame.distance)
+    if not set(labeled.load_id).isdisjoint(validation.load_id):
+        raise ValueError("Training and validation IDs overlap")
+    if "posted_rate" not in labeled:
+        raise ValueError("Training data must contain posted_rate")
+    target = pd.to_numeric(labeled.posted_rate, errors="coerce")
+    if not np.isfinite(target).all() or not target.gt(0).all():
+        raise ValueError("Training target must be finite and positive")
+    labeled["posted_rate"] = target
+    if pd.to_datetime(labeled.date).max() >= pd.to_datetime(validation.date).min():
+        raise ValueError("Validation dates must follow all training dates")
+    return labeled, validation
 
 
-def audit(data, validation):
-    result = {}
-    for name, frame in [('labeled',data),('validation',validation)]:
-        result[name] = {'rows':len(frame),'columns':list(frame),
-            'date_min':frame.date.min(),'date_max':frame.date.max(),
-            'missing':{k:int(v) for k,v in frame.isna().sum().items()},
-            'negative_weights':int(frame.weight.lt(0).sum()),
-            'duplicate_ids':int(frame.load_id.duplicated().sum()),
-            'duplicate_rows_without_id':int(frame.drop(columns='load_id').duplicated().sum())}
-    result['labeled']['nonpositive_target'] = int(data.posted_rate.le(0).sum())
-    result['labeled']['target_quantiles'] = {str(q):float(v) for q,v in data.posted_rate.quantile([0,.01,.5,.99,1]).items()}
-    return result
+def evaluate_holdout(train, holdout, output_dir: Path) -> dict:
+    model = TreeRateModel().fit(train)
+    predictions = model.predict(holdout)
+    medians = (train.posted_rate / train.distance).groupby(train.equipment).median()
+    baseline = holdout.distance * holdout.equipment.map(medians)
+    residuals = holdout[
+        ["load_id", "date", "equipment", "distance", "posted_rate"]
+    ].copy()
+    residuals["predicted_rate"] = predictions
+    residuals["baseline_rate"] = np.asarray(baseline)
+    residuals["absolute_error"] = np.abs(residuals.posted_rate - predictions)
+    residuals.to_csv(output_dir / "october_holdout_predictions.csv", index=False)
+    error_slices(residuals).to_csv(output_dir / "october_slices.csv", index=False)
+
+    squared = np.sort((residuals.posted_rate - predictions).to_numpy() ** 2)
+    largest = max(1, int(np.ceil(0.01 * len(squared))))
+    tail_share = (
+        float(squared[-largest:].sum() / squared.sum()) if squared.sum() else 0.0
+    )
+    return {
+        "selection": {
+            "criterion": "lowest August-September MAE",
+            "model": "tree_core",
+            "iterations": ITERATIONS,
+            "seed": SEED,
+        },
+        "split": {
+            "fit_start": train.date.min(),
+            "fit_end": train.date.max(),
+            "fit_n": len(train),
+            "holdout_start": holdout.date.min(),
+            "holdout_end": holdout.date.max(),
+            "holdout_n": len(holdout),
+        },
+        "october": {
+            **metrics(holdout.posted_rate, predictions),
+            "median_absolute_error": float(residuals.absolute_error.median()),
+            "p95_absolute_error": float(residuals.absolute_error.quantile(0.95)),
+            "largest_1pct_errors_share_squared_error": tail_share,
+        },
+        "october_baseline": metrics(holdout.posted_rate, baseline),
+        "october_mae_day_bootstrap_95pct": day_bootstrap_interval(holdout, predictions),
+    }
+
+
+def save_json(path: Path, value: dict) -> None:
+    path.write_text(json.dumps(value, indent=2) + "\n")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--data-dir', type=Path, default=Path('data'))
-    parser.add_argument('--skip-horizon-stress', action='store_true', help='Skip the additional two-month October check')
+    parser.add_argument("--data-dir", type=Path, default=Path("data"))
     args = parser.parse_args()
-    output = Path('results'); output.mkdir(exist_ok=True)
-    Path('models').mkdir(exist_ok=True)
-    data = pd.read_csv(args.data_dir/'train_test.csv')
-    validation = pd.read_csv(args.data_dir/'validation.csv')
-    if not data.load_id.is_unique or not validation.load_id.is_unique:
-        raise ValueError('Duplicate IDs in supplied datasets')
-    if not set(data.load_id).isdisjoint(validation.load_id):
-        raise ValueError('Labeled and prediction IDs overlap')
-    if not np.isfinite(data.posted_rate).all() or not data.posted_rate.gt(0).all():
-        raise ValueError('Labeled target must be finite and positive')
-    if not data.date.max() < validation.date.min():
-        raise ValueError('This validation strategy requires future-only prediction data')
-    train = data[data.date < '2025-10-01']
-    holdout = data[data.date >= '2025-10-01']
-    print('Evaluating fixed core model on October...', flush=True)
-    model = TreeRateModel('core').fit(train)
-    predictions = np.asarray(model.predict(holdout))
-    baselines = (train.posted_rate/train.distance).groupby(train.equipment).median()
-    baseline = np.asarray(holdout.distance * holdout.equipment.map(baselines))
-    summary = {'selection':{'criterion':'lowest August-September MAE',
-                           'model':'tree_core','iterations':1600,'seed':42},
-        'split':{'fit_start':train.date.min(),'fit_end':train.date.max(),'fit_n':len(train),
-                 'holdout_start':holdout.date.min(),'holdout_end':holdout.date.max(),'holdout_n':len(holdout)},
-        'october':metrics(holdout.posted_rate.to_numpy(),predictions),
-        'october_baseline':metrics(holdout.posted_rate.to_numpy(),baseline),
-        'october_mae_day_bootstrap_95pct':day_bootstrap_interval(holdout,predictions)}
-    print(json.dumps(summary,indent=2),flush=True)
-    residuals = holdout[['load_id','date','equipment','distance','posted_rate']].copy()
-    residuals['predicted_rate'] = predictions
-    residuals['baseline_rate'] = baseline
-    residuals['absolute_error'] = np.abs(residuals.posted_rate-predictions)
-    residuals.to_csv(output/'october_holdout_predictions.csv',index=False)
-    rows = []
-    for name, frame in residuals.groupby('equipment'):
-        rows.append({'slice':f'equipment={name}','n':len(frame),**metrics(frame.posted_rate,frame.predicted_rate)})
-    for label, mask in [('distance<=500',residuals.distance.le(500)),
-                        ('500<distance<=1500',residuals.distance.gt(500)&residuals.distance.le(1500)),
-                        ('distance>1500',residuals.distance.gt(1500))]:
-        frame = residuals[mask]
-        rows.append({'slice':label,'n':len(frame),**metrics(frame.posted_rate,frame.predicted_rate)})
-    pd.DataFrame(rows).to_csv(output/'october_slices.csv',index=False)
-    summary['october']['median_absolute_error'] = float(np.median(residuals.absolute_error))
-    summary['october']['p95_absolute_error'] = float(residuals.absolute_error.quantile(.95))
-    squared = np.sort((residuals.posted_rate-predictions).to_numpy()**2)
-    summary['october']['largest_1pct_errors_share_squared_error'] = float(squared[-int(np.ceil(.01*len(squared))):].sum()/squared.sum())
-    if not args.skip_horizon_stress:
-        print('Two-month horizon stress check: fit through August, predict October...',flush=True)
-        stress = TreeRateModel('core').fit(data[data.date < '2025-09-01'])
-        summary['october_two_month_horizon'] = metrics(holdout.posted_rate.to_numpy(),np.asarray(stress.predict(holdout)))
-    print('Refitting locked model on all 48,000 labeled loads...',flush=True)
-    model = TreeRateModel('core').fit(data)
-    joblib.dump(model,'models/freight.joblib')
-    importance = pd.Series(model.model.feature_importances_,index=model.model.feature_names_).sort_values(ascending=False)
-    importance.rename_axis('feature').reset_index(name='importance').to_csv(output/'feature_importance.csv',index=False)
-    template = pd.read_csv(args.data_dir/'validation_predictions_template.csv')
-    december_inputs = pd.read_csv(args.data_dir/'december_chart_inputs.csv')
-    predictions, december = predict_files(model,validation,template,december_inputs)
-    predictions.to_csv('validation_predictions.csv',index=False,float_format='%.2f')
-    december.to_csv(args.data_dir/'december_chart_inputs.csv',index=False,float_format='%.2f')
-    summary['final_fit_rows'] = len(data)
-    summary['output_rows'] = {'validation':len(predictions),'december':len(december)}
-    summary['december_range'] = [float(december.predicted_rate.min()),float(december.predicted_rate.max())]
-    (output/'metrics.json').write_text(json.dumps(summary,indent=2)+'\n')
-    (output/'data_audit.json').write_text(json.dumps(audit(data,validation),indent=2)+'\n')
-    paths = [args.data_dir/'train_test.csv',args.data_dir/'validation.csv',
-             args.data_dir/'validation_predictions_template.csv',Path('score.py')]
-    manifest = {str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
-    (output/'input_sha256.json').write_text(json.dumps(manifest,indent=2)+'\n')
-    print('Saved model, diagnostics and both completed submission files.',flush=True)
+    output_dir, model_dir = Path("results"), Path("models")
+    output_dir.mkdir(exist_ok=True)
+    model_dir.mkdir(exist_ok=True)
+    data, validation = load_inputs(args.data_dir)
+    train, holdout = split_before(data, "2025-10-01")
+
+    print("Evaluating the fixed model on October...", flush=True)
+    summary = evaluate_holdout(train, holdout, output_dir)
+    print(f"October MAE: ${summary['october']['mae']:.2f}", flush=True)
+
+    print("Checking the two-month forecast horizon...", flush=True)
+    earlier, _ = split_before(train, "2025-09-01")
+    stress = TreeRateModel().fit(earlier)
+    summary["october_two_month_horizon"] = metrics(
+        holdout.posted_rate, stress.predict(holdout)
+    )
+
+    print(f"Refitting on all {len(data):,} labeled loads...", flush=True)
+    model = TreeRateModel().fit(data)
+    joblib.dump(model, model_dir / "freight.joblib")
+    importance = pd.Series(
+        model.model.feature_importances_, index=model.model.feature_names_
+    )
+    importance.sort_values(ascending=False).rename_axis("feature").reset_index(
+        name="importance"
+    ).to_csv(
+        output_dir / "feature_importance.csv",
+        index=False,
+    )
+    predictions, december = write_predictions(
+        model, args.data_dir, Path("validation_predictions.csv")
+    )
+    summary["final_fit_rows"] = len(data)
+    summary["output_rows"] = {"validation": len(predictions), "december": len(december)}
+    summary["december_range"] = [
+        float(december.predicted_rate.min()),
+        float(december.predicted_rate.max()),
+    ]
+    save_json(output_dir / "metrics.json", summary)
+    save_json(output_dir / "data_audit.json", audit(data, validation))
+    inputs = [
+        args.data_dir / name
+        for name in [
+            "train_test.csv",
+            "validation.csv",
+            "validation_predictions_template.csv",
+        ]
+    ]
+    save_json(
+        output_dir / "input_sha256.json",
+        {
+            str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in [*inputs, Path("score.py")]
+        },
+    )
+    print("Saved model, diagnostics and both prediction files.", flush=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
