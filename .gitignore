@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.DS_Store
+catboost_info/
+tmp/
+models/
+*.zip
+data/train_test.csv
+data/validation.csv
+data/validation_predictions_template.csv
+results/october_holdout_predictions.csv

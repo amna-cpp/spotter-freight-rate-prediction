@@ -1,0 +1,6 @@
+{
+  "data/train_test.csv": "892980fd20bac7ac0ca4ec31d3981fca48d52dec88e4f02642ab955f1efb40fe",
+  "data/validation.csv": "f6cdc7c367b397b90b319fc7ad30fd0e1893fd6a714816dda54c303b0fe71151",
+  "data/validation_predictions_template.csv": "79de15adabcf807b8636b9b47ebe964d451fbcb343056c44a2c4b54a219891c6",
+  "score.py": "fac03021ae905a23f269903936926c7fabaf5a7b0f717936ae2df79268f9c519"
+}

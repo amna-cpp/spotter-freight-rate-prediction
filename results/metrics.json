@@ -1,0 +1,50 @@
+{
+  "selection": {
+    "criterion": "lowest August-September MAE",
+    "model": "tree_core",
+    "iterations": 1600,
+    "seed": 42
+  },
+  "split": {
+    "fit_start": "2025-01-01",
+    "fit_end": "2025-09-30",
+    "fit_n": 43147,
+    "holdout_start": "2025-10-01",
+    "holdout_end": "2025-10-31",
+    "holdout_n": 4853
+  },
+  "october": {
+    "mae": 100.25994774545248,
+    "rmse": 645.7634315509779,
+    "mape_pct": 4.697319078846455,
+    "r2": 0.8215223300207258,
+    "median_absolute_error": 26.670075656984864,
+    "p95_absolute_error": 141.65510050279403,
+    "largest_1pct_errors_share_squared_error": 0.9736886588168879
+  },
+  "october_baseline": {
+    "mae": 231.30495570141687,
+    "rmse": 683.8653433130296,
+    "mape_pct": 10.927255954373813,
+    "r2": 0.7998395899450672
+  },
+  "october_mae_day_bootstrap_95pct": [
+    84.69471691888641,
+    116.35645350579978
+  ],
+  "october_two_month_horizon": {
+    "mae": 99.11592929419461,
+    "rmse": 647.3990374513256,
+    "mape_pct": 4.64646532072823,
+    "r2": 0.820617079565578
+  },
+  "final_fit_rows": 48000,
+  "output_rows": {
+    "validation": 12000,
+    "december": 31
+  },
+  "december_range": [
+    824.078003684866,
+    842.1048855275025
+  ]
+}
