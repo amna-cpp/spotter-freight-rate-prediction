@@ -7,78 +7,79 @@ The italic directions are screen cues, not spoken lines.
 
 *Show the demo, with Lexington to Fort Wayne selected.*
 
-Hi, I'm Amna. For this assessment, I built a freight-rate prediction pipeline
-and a working demo. My focus was reliable future-month evaluation and a solution
-another engineer can reproduce.
+Hi, I'm Amna. I built a system that predicts freight prices, with a working demo.
+My main question was: how well will it perform on loads from later months?
 
 ## 0:15-0:45 — Data and validation
 
 *Show the split table on page one of the report.*
 
-The data contains 48,000 labeled loads from January through October. The final
-loads are in November and December, so I validated forward in time.
+The data contains 48,000 loads with known prices, from January through October.
+The final predictions are for November and December, so I tested on later months.
 
 I trained on January through July, compared models on August and September,
 then locked the choice before evaluating October.
 
-I also found missing and negative weights. I used equipment medians fitted
-only on each training fold, with a missingness flag.
+Some weights were missing or negative. I filled those using the typical weight
+for that equipment type, calculated from training data only, and marked them
+as filled in.
 
 ## 0:45-1:15 — The key finding and model choice
 
 *Point to the model comparison table.*
 
-One important finding was that the quote signal was extremely predictive in
-some months but unreliable in others. I tested it under identical model settings.
-Including the auxiliary signals increased development MAE from about 90 dollars
-to 135 dollars, so I excluded them.
+One useful finding was that an extra input called quote signal looked very
+helpful in some months, but was less reliable in others. In a controlled comparison,
+adding it and the market index increased average error from about 90 dollars
+to 135 dollars. I left both out.
 
-CatBoost performed best on that split and captured interactions between lane,
-equipment, distance, and calendar features.
+I chose CatBoost, a tree-based model. It performed best in these comparisons
+and can learn how route, distance, equipment and date affect prices together.
 
 ## 1:15-1:40 — Results and honest error analysis
 
 *Point to October MAE and the baseline.*
 
-On October's 4,853 loads, the selected model achieved a mean absolute error of
-100 dollars and 26 cents, compared with 231 dollars for the baseline—a 56.7 percent
-reduction.
+On October's 4,853 loads, the average prediction error was about 100 dollars
+per load, compared with 231 dollars for a simple comparison model.
+That's about 57 percent lower error.
 
-I kept extreme posted rates in evaluation. They explain the much higher RMSE,
-which I report alongside MAE.
+A few large mistakes remain. I kept the unusual prices in the test and included
+those errors in the report.
 
 ## 1:40-2:15 — Code walkthrough
 
 *Show the weight-imputation and loss setup in `freight_model.py`, then the ID join
 in `predict.py`. Have both files open beforehand.*
 
-Here, preprocessing is fitted within each training split. The model predicts
-rate per mile, with distance weights that align its loss with dollar error.
+Here, the cleaning step learns from training data only. The model learns price
+per mile, with training weights chosen to measure mistakes in dollars per load.
 
-Here, predictions are matched to the template by load ID, with uniqueness and
-coverage checks. One command recreates training, both output files, the scorer
-chart, and the report.
+Here, each prediction is matched to the correct load ID, with checks for missing
+or duplicate IDs. One command runs training and creates both prediction files,
+the required chart, and the report.
 
 ## 2:15-2:50 — Demo, limitation and closing
 
 *Return to the demo and show the December curve. Keep it brief.*
 
-The demo makes the estimate and validation approach easy to inspect. The supplied
-scorer validates all 12,000 predictions and 31 December rows; it doesn't measure
-hidden-label accuracy.
+The demo lets you enter a load and see a real model estimate. The supplied scorer
+checks all 12,000 predictions and 31 December rows. Their actual prices are
+unavailable, so I cannot claim a final accuracy score.
 
-With only ten labeled months, December seasonality remains uncertain. With new
-labels, I'd monitor error by equipment, distance, and time.
+With only ten months of known prices, December's seasonal changes remain uncertain.
+My next step would be to track errors as new prices arrive.
 
-This project shows how I approach ML work: test assumptions, justify decisions
-with evidence, and make the result reproducible and usable.
+My approach is simple: check the data, test each choice, explain the results,
+and make the work easy for another engineer to run.
 
 ## Recording notes
 
 - Speak at a comfortable pace; the screen cues are approximate, not deadlines.
 - Keep the camera bubble away from the table and code you point to.
 - Use a readable editor zoom and pre-open the report, code and demo.
-- Pause after the 56.7% result. Explain it; do not call it "56.7% accuracy."
+- Pause after the improvement. "About 57 percent lower error" rounds the measured
+  56.7% reduction; it is not an accuracy percentage.
 - Say "suspected proxy risk" if asked about leakage. The data does not prove how
   the quote signal was generated.
 - Explain the choices in your own words and be ready to answer follow-up questions.
