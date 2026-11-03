@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f3f1e9" />
+    <meta
+      name="description"
+      content="Try a freight-rate model and see how it was validated. A working assessment demo by Amna Hameed."
+    />
+    <title>Rate desk — Freight rate study</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#estimate">Skip to the estimator</a>
+    <header class="masthead wrap">
+      <a href="/" class="wordmark" aria-label="Rate desk home"
+        ><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>Rate
+        desk<span class="edition">A freight rate study</span></a
+      >
+      <nav aria-label="Main navigation">
+        <a href="#method">The approach</a>
+        <a
+          href="https://github.com/amna-cpp/spotter-freight-rate-prediction"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Source <span aria-hidden="true">↗</span></a
+        >
+      </nav>
+    </header>
+
+    <main class="wrap">
+      <section class="introduction" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">01 / The working model</p>
+          <h1 id="page-title">Price a load.</h1>
+        </div>
+        <p class="intro-copy">
+          Enter a route and load details.<br />Get an estimate from the trained
+          model,<br class="desktop-break" />
+          then see the work behind it.
+        </p>
+      </section>
+
+      <section class="workspace" id="estimate" aria-label="Load rate estimator">
+        <form id="load-form" class="load-sheet">
+          <div class="section-heading">
+            <h2>Load details</h2>
+            <span class="small muted">All rates in USD</span>
+          </div>
+          <div class="route-inputs">
+            <div class="field">
+              <label for="pickup">Pickup</label
+              ><select id="pickup" name="pickup" required>
+                <option>Lexington</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="delivery">Delivery</label
+              ><select id="delivery" name="delivery" required>
+                <option>Fort Wayne</option>
+              </select>
+            </div>
+          </div>
+          <div class="field-pair">
+            <div class="field">
+              <label for="distance"
+                >Road distance <span class="unit">mi</span></label
+              ><input
+                id="distance"
+                name="distance"
+                type="number"
+                min="70"
+                max="3500"
+                step="0.1"
+                value="360"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="weight">Weight <span class="unit">lb</span></label
+              ><input
+                id="weight"
+                name="weight"
+                type="number"
+                min="1"
+                max="80000"
+                step="1"
+                value="32000"
+                placeholder="Use typical weight"
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label for="equipment">Equipment</label
+            ><select id="equipment" name="equipment">
+              <option>Dry Van</option>
+              <option>Reefer</option>
+              <option>Flatbed</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="date">Pickup date</label
+            ><input
+              id="date"
+              name="date"
+              type="date"
+              min="2025-11-01"
+              max="2025-12-31"
+              value="2025-12-04"
+              required
+            /><span class="field-note"
+              >This study covers November–December 2025.</span
+            >
+          </div>
+          <button class="estimate-button" id="submit-button" type="submit">
+            <span>Estimate rate</span><span aria-hidden="true">→</span>
+          </button>
+          <p id="form-error" class="form-error" role="alert" hidden></p>
+          <div class="examples">
+            <span class="small muted">Try a load</span
+            ><button type="button" data-preset="december">
+              December example</button
+            ><button type="button" data-preset="longhaul">Long haul</button>
+          </div>
+          <p class="form-footnote">
+            64 cities from the training data. Enter road miles separately. Leave
+            weight blank to use the equipment median.
+          </p>
+        </form>
+
+        <div class="output-sheet">
+          <section
+            class="result"
+            aria-labelledby="result-heading"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div class="section-heading">
+              <h2 id="result-heading">Model estimate</h2>
+              <span class="model-label">CatBoost · fitted on 48,000 loads</span>
+            </div>
+            <div class="price-line">
+              <p class="price" id="estimated-rate">—</p>
+              <p class="per-mile" id="per-mile">Choose a load to begin</p>
+            </div>
+            <div class="route-summary">
+              <span id="summary-pickup">Lexington</span
+              ><span class="route-line" aria-hidden="true"></span
+              ><span id="summary-delivery">Fort Wayne</span>
+            </div>
+            <p id="load-summary" class="load-summary">
+              360 mi · Dry Van · 32,000 lb · Dec 4, 2025
+            </p>
+            <p id="weight-note" class="weight-note" hidden></p>
+            <div class="estimate-context">
+              <span class="context-number">$100.26</span>
+              <p>
+                Average absolute error on the October holdout.<br /><span
+                  class="muted"
+                  >A model estimate, not a live carrier quote.</span
+                >
+              </p>
+            </div>
+          </section>
+
+          <section class="calendar-study" aria-labelledby="calendar-title">
+            <div class="section-heading chart-heading">
+              <div>
+                <h2 id="calendar-title">One route, 31 dates.</h2>
+                <p class="small muted">
+                  Lexington → Fort Wayne · 360 mi · Dry Van · 32,000 lb
+                </p>
+              </div>
+              <span class="chart-year">DEC / 2025</span>
+            </div>
+            <div class="chart-container">
+              <svg
+                id="december-chart"
+                viewBox="0 0 650 190"
+                role="img"
+                aria-label="December model predictions for the fixed Lexington to Fort Wayne load"
+              ></svg>
+            </div>
+            <div class="date-selection">
+              <label for="chart-day">Explore the daily estimates</label
+              ><output id="day-readout" for="chart-day">Dec 4 · $842.10</output>
+            </div>
+            <input
+              id="chart-day"
+              class="day-slider"
+              type="range"
+              min="1"
+              max="31"
+              value="4"
+              aria-label="December day"
+              aria-valuetext="December 4, $842.10"
+            />
+            <div class="chart-footer">
+              <p class="small muted">
+                Only the date changes in this comparison.
+              </p>
+              <button type="button" class="text-button" id="use-chart-load">
+                Use this load <span aria-hidden="true">↗</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="method" id="method" aria-labelledby="method-title">
+        <div class="method-heading">
+          <div>
+            <p class="eyebrow">02 / The work behind it</p>
+            <h2 id="method-title">Checked against the future.</h2>
+          </div>
+          <p class="method-intro">
+            The final loads come after the training period.<br />Validation
+            follows that same order.
+          </p>
+        </div>
+        <ol class="timeline">
+          <li>
+            <span class="step-number">01</span>
+            <h3>Compare</h3>
+            <p class="date-line">Train Jan–Jul → check Aug–Sep</p>
+            <p>
+              Compare a simple baseline, an additive model, and boosted trees.
+              Choose using dollar MAE.
+            </p>
+          </li>
+          <li>
+            <span class="step-number">02</span>
+            <h3>Hold out October</h3>
+            <p class="date-line">Train Jan–Sep → check Oct</p>
+            <p>
+              Evaluate the fixed choice on 4,853 later loads. Keep all rows,
+              including the large errors.
+            </p>
+          </li>
+          <li>
+            <span class="step-number">03</span>
+            <h3>Refit &amp; predict</h3>
+            <p class="date-line">Train Jan–Oct → predict Nov–Dec</p>
+            <p>
+              Refit on all 48,000 labeled loads. Match the 12,000 predictions to
+              their load IDs.
+            </p>
+          </li>
+        </ol>
+        <div class="validation-row">
+          <div class="validation-intro">
+            <h3>October, in dollars.</h3>
+            <p>
+              Mean absolute error measures the average size of a pricing error.
+              Lower is better.
+            </p>
+          </div>
+          <div class="comparison">
+            <div>
+              <span>Equipment + distance baseline</span><strong>$231.30</strong>
+            </div>
+            <div class="selected-model">
+              <span>Selected model</span><strong>$100.26</strong>
+            </div>
+            <p>56.7% lower MAE on the same holdout.</p>
+          </div>
+          <dl class="other-metrics">
+            <div>
+              <dt>MAPE</dt>
+              <dd>4.70%</dd>
+            </div>
+            <div>
+              <dt>RMSE</dt>
+              <dd>$645.76</dd>
+            </div>
+            <div>
+              <dt>R²</dt>
+              <dd>0.822</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="details-row">
+          <details>
+            <summary>What goes into the model?</summary>
+            <p>
+              Pickup, delivery, distance, equipment, weight, and date. The model
+              also derives lane, calendar, and location features. Missing or
+              invalid weights use equipment medians learned from the training
+              fold. The unstable market and quote signals were excluded after a
+              future-month comparison.
+            </p>
+          </details>
+          <details>
+            <summary>What should I keep in mind?</summary>
+            <p>
+              There are ten labeled months from one year. This curve cannot
+              establish December holiday peaks or future market shocks. The
+              $100.26 historical error is not a confidence interval for an
+              individual load. Hidden November–December accuracy is unknown.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="deliverables" aria-label="Assessment deliverables">
+        <p>
+          <span class="check" aria-hidden="true">✓</span>12,000 load predictions
+          and 31 December rows passed the supplied scorer.
+        </p>
+        <div>
+          <a
+            href="https://github.com/amna-cpp/spotter-freight-rate-prediction/blob/main/output/pdf/freight_rate_report.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Read the report ↗</a
+          ><a
+            href="https://github.com/amna-cpp/spotter-freight-rate-prediction/blob/main/validation_predictions.csv"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Prediction CSV ↗</a
+          >
+        </div>
+      </section>
+    </main>
+    <footer class="wrap footer">
+      <p>Built by Amna Hameed</p>
+      <p>Freight rate assessment · Historical 2025 model</p>
+      <a
+        href="https://github.com/amna-cpp/spotter-freight-rate-prediction"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Code &amp; run instructions ↗</a
+      >
+    </footer>
+  </body>
+</html>

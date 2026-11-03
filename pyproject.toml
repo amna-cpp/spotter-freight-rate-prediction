@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py312"
 line-length = 88
-extend-exclude = ["score.py"]
+extend-exclude = ["score.py", "demo/model/exported.py"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]

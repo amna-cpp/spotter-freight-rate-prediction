@@ -11,8 +11,9 @@
 | Include the December chart in the report | `output/pdf/freight_rate_report.pdf` |
 | Accessible code, dependencies and instructions | Public repository, requirements, `README.md` |
 | Efficient, repeatable workflow | `python run.py`; fixed seed and CPU thread limit |
+| Interactive demonstration | [Rate desk on Vercel](https://spotter-rate-desk.vercel.app); real exported model |
 | Clean code and concise comments | Ruff checks, portable tests, public CI |
-| 2-3 minute camera-on Loom | **Candidate action remaining**; `LOOM_WALKTHROUGH.md` is the guide |
+| 2-3 minute camera-on Loom | **Candidate action remaining**; `LOOM_SCRIPT.md` contains the timed script |
 
 The scorer validates files; it does not calculate hidden-label accuracy. The
 reported October metrics use only labeled development data. Raw assessment

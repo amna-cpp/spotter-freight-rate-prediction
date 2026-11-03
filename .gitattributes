@@ -1,2 +1,3 @@
 *.pdf binary
 *.png binary
+demo/model/exported.py binary linguist-generated=true

@@ -1,5 +1,8 @@
 # Camera-on walkthrough guide
 
+Use [the final timed script](LOOM_SCRIPT.md) for recording. The outline below is
+extra preparation material; do not read both scripts in the video.
+
 Record this yourself in Loom with camera on. Aim for 2-3 minutes. Replace the prose
 with your own explanation and make sure you can explain each decision. Do not
 submit this guide as a recording link.

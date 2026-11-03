@@ -1,9 +1,25 @@
 # Freight rate prediction
 
+[**Open the live demo →**](https://spotter-rate-desk.vercel.app)
+
 A reproducible submission for Spotter's Machine Learning Engineer assessment.
 The final estimator uses pickup, delivery, distance, equipment, weight and date.
 It predicts all **12,000** future loads and the **31** fixed December inputs with
 the same fitted model.
+
+The [interactive demo](demo/README.md) runs the actual fitted model. Enter a load,
+explore the December curve, and read the short validation walkthrough. It uses
+plain HTML/CSS/JavaScript and a lightweight Python model export on Vercel.
+The 64 supported cities and date range match the demo's historical study scope.
+
+To preview locally without installing the training packages:
+
+```bash
+python demo/serve.py
+```
+
+Then open `http://127.0.0.1:8765`. Rebuild the export after retraining with
+`python export_demo.py` in the assessment environment.
 
 ## Results
 
@@ -128,8 +144,8 @@ python predict.py --model models/freight.joblib
 - `validation_predictions.csv` - exactly `load_id,predicted_rate` for 12,000 loads.
 - `output/pdf/freight_rate_report.pdf` - validation, methodology and the required chart.
 - This repository URL.
-- Your recorded **2-3 minute Loom URL with camera on**. Use `LOOM_WALKTHROUGH.md`
-  as a speaking guide. A recording/link must still be created by the candidate.
+- Your recorded **2-3 minute Loom URL with camera on**. Use `LOOM_SCRIPT.md`
+  as the timed speaking script. A recording/link must still be created by the candidate.
 
 Other useful files: `data/december_chart_inputs.csv` contains the completed December
 predictions; `scorer_results/candidate_december.png` is the original scorer's chart;
