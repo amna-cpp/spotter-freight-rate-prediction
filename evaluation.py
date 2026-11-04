@@ -9,10 +9,12 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 def metrics(actual, predicted) -> dict:
     actual, predicted = np.asarray(actual), np.asarray(predicted)
+    relative_error = np.abs(actual - predicted) / actual
     return {
         "mae": float(mean_absolute_error(actual, predicted)),
         "rmse": float(np.sqrt(mean_squared_error(actual, predicted))),
-        "mape_pct": float(np.mean(np.abs(actual - predicted) / actual) * 100),
+        "mape_pct": float(np.mean(relative_error) * 100),
+        "within_10pct_pct": float(np.mean(relative_error <= 0.10) * 100),
         "r2": float(r2_score(actual, predicted)),
     }
 
@@ -30,12 +32,17 @@ def split_before(frame: pd.DataFrame, cutoff: str) -> tuple[pd.DataFrame, pd.Dat
 
 
 def day_bootstrap_interval(frame: pd.DataFrame, predictions) -> list[float]:
-    errors = pd.DataFrame(
-        {
-            "date": frame.date.to_numpy(),
-            "error": np.abs(frame.posted_rate.to_numpy() - predictions),
-        }
-    )
+    return _day_interval(frame, np.abs(frame.posted_rate.to_numpy() - predictions))
+
+
+def paired_mae_interval(frame, original, revised) -> list[float]:
+    actual = frame.posted_rate.to_numpy()
+    improvement = np.abs(actual - original) - np.abs(actual - revised)
+    return _day_interval(frame, improvement)
+
+
+def _day_interval(frame, values):
+    errors = pd.DataFrame({"date": frame.date.to_numpy(), "error": values})
     by_day = errors.groupby("date").error.agg(["sum", "count"])
     indices = np.random.default_rng(42).integers(
         0, len(by_day), size=(2000, len(by_day))

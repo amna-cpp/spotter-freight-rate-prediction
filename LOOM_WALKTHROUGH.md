@@ -1,53 +1,23 @@
-# Camera-on walkthrough guide
+# Recording preparation
 
-Use [the final timed script](LOOM_SCRIPT.md) for recording. The outline below is
-extra preparation material; do not read both scripts in the video.
+Use `LOOM_SCRIPT.md` for the one-paragraph script. Keep your camera on and aim
+for 2–3 minutes. Only two screens are needed: the demo, then one code file.
 
-Record this yourself in Loom with camera on. Aim for 2-3 minutes. Replace the prose
-with your own explanation and make sure you can explain each decision. Do not
-submit this guide as a recording link.
+1. Start on the demo and click **Estimate rate**.
+2. Scroll to **Checked against the future** to explain the two earlier comparison
+   windows and October results. Stay on the same page.
+3. Switch once to VS Code and show `freight_model.py`, around lines 36–65.
+   Explain training-only weight cleaning. Finish speaking on this screen.
 
-## 0:00-0:30 - Data and findings
+Remember the story: load details → estimate → later-month tests → results → code.
+The model first learns broad pricing effects, then uses CatBoost to correct the
+remaining errors. On October, average error is $99.29 per load, versus $231.30
+for the simple equipment/distance model. About 98.33% of predictions are within
+10% of the actual price. Some large errors remain.
 
-Show `results/data_audit.json` and `results/development_comparison.csv`.
+The revision was selected using pre-October data. October was previously inspected
+for the original model, so it is a reused check. The final November–December prices
+are unknown. Do not call 100 minus MAPE an accuracy score.
 
-"The labeled data has 48,000 loads from January through October. The 12,000 final
-loads are in November and December, so this is a future prediction task. I found
-missing and negative weights and a long tail of posted rates. The quote signal
-looks extremely predictive in some months but is unstable across time."
-
-## 0:30-1:05 - Validation and model choice
-
-Show the comparison table in the report.
-
-"I fitted January through July and compared models on August and September. The
-core-input CatBoost model had about 90 dollars MAE, compared with 235 for a simple
-equipment rate-per-mile baseline. Adding the auxiliary signals worsened the
-future-month result. I then locked the settings, fitted through September and
-evaluated October: about 100 dollars MAE and 4.7 percent MAPE. The high RMSE reflects
-a small number of large errors; I report those rather than dropping them."
-
-## 1:05-1:45 - Important code
-
-Show `freight_model.py`, then `train.py`.
-
-"Preprocessing is fitted inside each time split. Invalid weights use a training-only
-equipment median and a missingness flag. Features describe equipment, the directional
-lane, distance, weight and calendar patterns. The model predicts rate per mile, with
-distance weights that make its MAE objective proportional to dollar error. The
-training script evaluates the fixed model, checks the longer horizon, then refits
-on all labeled loads. Load IDs are never features."
-
-## 1:45-2:30 - Outputs, chart and limitations
-
-Show `predict.py`, the scorer output and `scorer_results/candidate_december.png`.
-
-"Predictions are matched by ID to the supplied template and checked for missing or
-duplicate IDs and invalid prices. The same trained model generates the 31 December
-points from the six fixed inputs. The unchanged scorer validates both CSVs and
-creates this chart; it does not report final accuracy. The report explains the
-limited seasonal history and outlier risk. The README has the complete commands
-to recreate the predictions and report."
-
-Before submitting, verify the Loom link opens for someone outside your account and
-paste that actual link into your submission message.
+After recording, check that someone outside your account can open the Loom link.
+The actual camera-on recording and link are still your submission step.

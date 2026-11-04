@@ -1,12 +1,13 @@
 """Small fixtures check leakage guards and submission contracts."""
 
 import unittest
+from unittest.mock import Mock
 
 import numpy as np
 import pandas as pd
 
-from evaluation import split_before
-from freight_model import CORE, RateFeatures, validate_features
+from evaluation import metrics, split_before
+from freight_model import CORE, RateFeatures, ResidualRateModel, validate_features
 from predict import predict_files
 from score import validate_predictions
 
@@ -115,6 +116,22 @@ class ContractTests(unittest.TestCase):
     def test_empty_time_split_fails(self):
         with self.assertRaises(ValueError):
             split_before(self.train, "2026-01-01")
+
+    def test_percentage_metrics_describe_errors_without_sign_cancellation(self):
+        result = metrics([100.0, 100.0, 100.0], [90.0, 110.0, 130.0])
+        self.assertAlmostEqual(result["mape_pct"], 100 / 6)
+        self.assertAlmostEqual(result["within_10pct_pct"], 200 / 3)
+
+    def test_residual_model_can_correct_prices_downward(self):
+        model = ResidualRateModel()
+        model.features = Mock()
+        model.features.transform.return_value = self.validation
+        model.baseline = DistanceModel()
+        model.model = Mock()
+        model.model.predict.return_value = np.full(len(self.validation), -0.5)
+        np.testing.assert_allclose(
+            model.predict(self.validation), self.validation.distance * 1.5
+        )
 
     def test_original_scorer_rejects_incomplete_output(self):
         with self.assertRaises(SystemExit):

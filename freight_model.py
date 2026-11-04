@@ -93,25 +93,27 @@ class RateFeatures:
 
 
 class TreeRateModel:
-    def __init__(self, mode: str = "core", iterations: int = ITERATIONS):
+    def __init__(self, mode="core", iterations=ITERATIONS, parameters=None):
         if mode not in {"core", "market", "quote"}:
             raise ValueError(f"Unknown feature mode: {mode}")
         self.mode, self.iterations = mode, iterations
+        self.parameters = parameters or {}
 
     def fit(self, frame: pd.DataFrame) -> TreeRateModel:
         self.features = RateFeatures().fit(frame)
         x = self.features.transform(frame, self.mode)
-        self.model = CatBoostRegressor(
-            iterations=self.iterations,
-            depth=6,
-            learning_rate=0.045,
-            loss_function="MAE",
-            l2_leaf_reg=8,
-            random_seed=SEED,
-            thread_count=4,
-            verbose=False,
-            allow_writing_files=False,
-        )
+        settings = {
+            "iterations": self.iterations,
+            "depth": 6,
+            "learning_rate": 0.045,
+            "loss_function": "MAE",
+            "l2_leaf_reg": 8,
+            "random_seed": SEED,
+            "thread_count": 4,
+            "verbose": False,
+            "allow_writing_files": False,
+        }
+        self.model = CatBoostRegressor(**(settings | self.parameters))
         # Distance weights align rate-per-mile loss with dollar MAE.
         self.model.fit(
             x,
@@ -186,3 +188,23 @@ class AdditiveRateModel:
 
     def predict(self, frame):
         return np.maximum(1.0, self.model.predict(self._matrix(frame)) * frame.distance)
+
+
+class ResidualRateModel(TreeRateModel):
+    """Fit smooth pricing effects first, then learn their remaining errors."""
+
+    def __init__(self, depth=4):
+        super().__init__(iterations=2400, parameters={"depth": depth})
+
+    def fit(self, frame):
+        self.baseline = AdditiveRateModel(harmonics=0).fit(frame)
+        centered = frame.assign(
+            posted_rate=frame.posted_rate - self.baseline.predict(frame)
+        )
+        super().fit(centered)
+        return self
+
+    def predict(self, frame):
+        features = self.features.transform(frame)
+        correction = self.model.predict(features) * features.distance.to_numpy()
+        return np.maximum(1.0, self.baseline.predict(frame) + correction)

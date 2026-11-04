@@ -11,7 +11,7 @@
     <title>Rate desk — Freight rate study</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
-    <script src="/app.js" defer></script>
+    <script src="/app.js?v=2" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#estimate">Skip to the estimator</a>
@@ -140,7 +140,7 @@
           >
             <div class="section-heading">
               <h2 id="result-heading">Model estimate</h2>
-              <span class="model-label">CatBoost · fitted on 48,000 loads</span>
+              <span class="model-label">Additive + CatBoost · 48,000 loads</span>
             </div>
             <div class="price-line">
               <p class="price" id="estimated-rate">—</p>
@@ -156,9 +156,9 @@
             </p>
             <p id="weight-note" class="weight-note" hidden></p>
             <div class="estimate-context">
-              <span class="context-number">$100.26</span>
+              <span class="context-number" id="context-mae">—</span>
               <p>
-                Average absolute error on the October holdout.<br /><span
+                Average absolute error on the October check.<br /><span
                   class="muted"
                   >A model estimate, not a live carrier quote.</span
                 >
@@ -225,19 +225,19 @@
           <li>
             <span class="step-number">01</span>
             <h3>Compare</h3>
-            <p class="date-line">Train Jan–Jul → check Aug–Sep</p>
+            <p class="date-line">Jan–May → Jun–Jul; Jan–Jul → Aug–Sep</p>
             <p>
-              Compare a simple baseline, an additive model, and boosted trees.
-              Choose using dollar MAE.
+              Compare five candidates on Jun–Jul and Aug–Sep. Choose using
+              average dollar MAE across both windows.
             </p>
           </li>
           <li>
             <span class="step-number">02</span>
-            <h3>Hold out October</h3>
+            <h3>Check October</h3>
             <p class="date-line">Train Jan–Sep → check Oct</p>
             <p>
-              Evaluate the fixed choice on 4,853 later loads. Keep all rows,
-              including the large errors.
+              Check the fixed revision on 4,853 later loads. October was
+              previously inspected; it is a reused test.
             </p>
           </li>
           <li>
@@ -260,25 +260,26 @@
           </div>
           <div class="comparison">
             <div>
-              <span>Equipment + distance baseline</span><strong>$231.30</strong>
+              <span>Equipment + distance baseline</span><strong id="baseline-mae">—</strong>
             </div>
             <div class="selected-model">
-              <span>Selected model</span><strong>$100.26</strong>
+              <span>Selected model</span><strong id="selected-mae">—</strong>
             </div>
-            <p>56.7% lower MAE on the same holdout.</p>
+            <p id="mae-improvement"></p>
+            <p id="within-tolerance"></p>
           </div>
           <dl class="other-metrics">
             <div>
               <dt>MAPE</dt>
-              <dd>4.70%</dd>
+              <dd id="metric-mape">—</dd>
             </div>
             <div>
               <dt>RMSE</dt>
-              <dd>$645.76</dd>
+              <dd id="metric-rmse">—</dd>
             </div>
             <div>
               <dt>R²</dt>
-              <dd>0.822</dd>
+              <dd id="metric-r2">—</dd>
             </div>
           </dl>
         </div>
@@ -287,7 +288,8 @@
             <summary>What goes into the model?</summary>
             <p>
               Pickup, delivery, distance, equipment, weight, and date. The model
-              also derives lane, calendar, and location features. Missing or
+              first fits smooth pricing effects, then CatBoost learns their
+              remaining errors using lane, calendar, and location features. Missing or
               invalid weights use equipment medians learned from the training
               fold. The unstable market and quote signals were excluded after a
               future-month comparison.
@@ -298,7 +300,7 @@
             <p>
               There are ten labeled months from one year. This curve cannot
               establish December holiday peaks or future market shocks. The
-              $100.26 historical error is not a confidence interval for an
+              historical average error is not a confidence interval for an
               individual load. Hidden November–December accuracy is unknown.
             </p>
           </details>

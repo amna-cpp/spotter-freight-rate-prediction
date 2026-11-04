@@ -23,16 +23,25 @@ Then open `http://127.0.0.1:8765`. Rebuild the export after retraining with
 
 ## Results
 
-The model was selected on **August-September** after fitting January-July.
+The original model was selected on **August-September** after fitting January-July.
 CatBoost using the core inputs achieved **$90.25 MAE**, versus **$235.21** for
 the equipment-median rate-per-mile baseline. Adding `market_index` gave $97.90;
 adding both auxiliary signals gave $134.80. These comparisons use identical
 CatBoost settings and the same chronological split.
 
-After selection, fitting January-September and evaluating **October's 4,853
-loads** gave **$100.26 MAE**, **$645.76 RMSE**, **4.70% MAPE** and **0.822 R2**.
-The baseline's October MAE was $231.30 (a **56.7% reduction**). A day-block
-bootstrap gives an approximate 95% MAE interval of **$84.69-$116.36**.
+The revision fits a smooth additive baseline, then uses CatBoost to correct its
+remaining errors. Five candidates were compared on **June-July** and
+**August-September**, using only earlier training months in each window. Mean
+window MAE fell from **$109.73 to $104.37**. See [research and decisions](MODEL_RESEARCH.md).
+
+Fitting January-September and checking **October's 4,853 loads** gives
+**$99.29 MAE**, **$645.89 RMSE**, **4.66% MAPE** and **0.821 R2**.
+**98.33% of predictions are within 10% of the actual price.** This explicit
+tolerance is not classification accuracy; MAPE is not an accuracy percentage.
+The original model's MAE was $100.26: the revision improves MAE by **0.97%**,
+while RMSE is slightly worse ($645.76 originally). The paired day-bootstrap 95%
+interval for the MAE improvement is **$0.07-$1.93** per load. The simple baseline's
+MAE is $231.30, a **57.1% reduction** for the revision.
 These are local labeled holdout results; final November-December accuracy is unknown.
 The supplied scorer checks file validity and produces a chart; it does not calculate accuracy.
 
@@ -68,7 +77,8 @@ python -m unittest discover -s tests -v
 `run.py` runs `train.py`, the unchanged `score.py`, and `make_report.py` in order,
 stopping on any failure. Training includes the October evaluation, a two-month
 horizon check, and the final refit. To reproduce the original model comparison,
-run `python experiment.py`; it uses only January-September.
+run `python experiment.py`; it uses only January-September. Run `python tune.py`
+to reproduce the five-candidate revision comparison on both earlier windows.
 
 The provided scorer can also be run directly:
 
@@ -78,7 +88,7 @@ python score.py --predictions validation_predictions.csv --december-predictions 
 
 For the exact tested versions, install `requirements.lock.txt` instead. On a different
 operating system, pip selects its compatible wheels. CatBoost training uses four CPU
-threads, a fixed seed and 1,600 iterations; small platform-level numeric differences
+threads, a fixed seed and 2,400 residual-tree iterations; small platform-level numeric differences
 are possible. No external services, external datasets or API credentials are needed.
 The generated model is ignored by Git and recreated by `train.py`.
 
@@ -100,16 +110,17 @@ python predict.py --model models/freight.joblib
 
 ## Validation and modeling decisions
 
-- **Forward validation:** January-July (33,718 rows) -> August-September (9,429)
-  selects the candidate using pooled dollar MAE. January-September (43,147) ->
-  October (4,853) evaluates the locked choice. A second fixed-model check trains
+- **Forward validation:** January-May (24,023 rows) -> June-July (9,695), and
+  January-July (33,718) -> August-September (9,429), select the revision using
+  mean window dollar MAE. January-September (43,147) -> October (4,853) checks
+  the fixed choice. A second fixed-model check trains
   through August and evaluates October to test a two-month forecast horizon.
   Finally, January-October (48,000) is used to predict November-December.
   Splits keep whole dates together. No random split mixes future and past loads.
-- **Selection discipline:** October labels do not fit preprocessing, choose a model,
-  tune settings or early-stop. Initial descriptive EDA summarized the full labeled
-  file; October is a model-selection holdout, not a completely blinded dataset.
-  The two-month stress check is diagnostic and does not change the chosen model.
+- **Selection discipline:** Revision comparisons, preprocessing and settings use
+  only pre-October data; no October early stopping is used. October was already
+  inspected during the original assessment, so it is a reused historical check,
+  not a fresh blind test. The two-month stress check does not change the model.
 - **Dirty inputs:** 300 labeled weights are missing and 292 are negative. Negative
   weights are treated as invalid rather than assumed to be sign errors. Invalid or
   missing weights use equipment medians fitted only on the current training fold,
@@ -128,13 +139,13 @@ python predict.py --model models/freight.joblib
   prediction rows are not used. No `load_id`, label or manually computed target-derived
   aggregate is used as an input. CatBoost learns its categorical statistics internally
   within each training fit.
-- **Model:** CatBoost handles category interactions without a large sparse lane
-  matrix. It predicts rate per mile with distance-proportional sample weights:
-  minimizing weighted rate-per-mile MAE is equivalent, up to a constant, to
-  minimizing dollar MAE. Prediction multiplies by distance and applies a $1 floor.
-  Depth 6, learning rate 0.045, L2 8, seed 42, 1,600 iterations; no early stopping
-  against the October holdout. The simpler Huber additive alternatives are retained
-  in `experiment.py` for comparison.
+- **Model:** A Huber additive baseline learns smooth distance/weight and categorical
+  effects without annual harmonics. CatBoost predicts its signed remaining error
+  per mile with distance-proportional sample weights. This loss is equivalent,
+  up to a constant, to dollar MAE. Prediction adds the correction to the baseline
+  and applies a $1 floor to the total. Depth 4, learning rate 0.045, L2 8, seed 42,
+  2,400 iterations; no October early stopping. The original estimators remain
+  available in `experiment.py` for comparison.
 - **Output safety:** Validation rates are joined to template IDs with uniqueness
   and exact-ID-set checks. Input row order and December's original six input
   columns are preserved. Predictions are finite, positive and written to cents.
@@ -149,7 +160,7 @@ python predict.py --model models/freight.joblib
 
 Other useful files: `data/december_chart_inputs.csv` contains the completed December
 predictions; `scorer_results/candidate_december.png` is the original scorer's chart;
-`results/metrics.json`, `results/development_comparison.csv`,
+`results/metrics.json`, `results/development_comparison.csv`, `results/tuning_comparison.csv`,
 `results/october_slices.csv` preserve aggregate evidence. Running `train.py` also
 writes a local-only October prediction ledger, excluded from the public repository.
 `results/input_sha256.json` fingerprints immutable model inputs and the original scorer.
@@ -164,6 +175,7 @@ writes a local-only October prediction ledger, excluded from the public reposito
 | `train.py` | Fixed-model evaluation and final training |
 | `predict.py` | Saved-model inference and ID matching |
 | `experiment.py` | Development comparisons |
+| `tune.py` | Revision comparison using two earlier forecast windows |
 | `make_report.py` | Report from saved results and scorer chart |
 
 Test fixtures cover ID matching, invalid inputs, training-only imputation, signal exclusion,

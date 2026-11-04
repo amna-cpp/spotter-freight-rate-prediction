@@ -1,8 +1,9 @@
 {
   "selection": {
-    "criterion": "lowest August-September MAE",
-    "model": "tree_core",
-    "iterations": 1600,
+    "criterion": "lowest mean MAE across June-July and August-September",
+    "model": "residual_4",
+    "iterations": 2400,
+    "depth": 4,
     "seed": 42
   },
   "split": {
@@ -14,29 +15,47 @@
     "holdout_n": 4853
   },
   "october": {
-    "mae": 100.25994774545248,
-    "rmse": 645.7634315509779,
-    "mape_pct": 4.697319078846455,
-    "r2": 0.8215223300207258,
-    "median_absolute_error": 26.670075656984864,
-    "p95_absolute_error": 141.65510050279403,
-    "largest_1pct_errors_share_squared_error": 0.9736886588168879
+    "mae": 99.28802045258206,
+    "rmse": 645.8863846679083,
+    "mape_pct": 4.655163620411722,
+    "within_10pct_pct": 98.33092932206883,
+    "r2": 0.8214543593867271,
+    "median_absolute_error": 25.549546210681,
+    "p95_absolute_error": 138.91419859757306,
+    "largest_1pct_errors_share_squared_error": 0.9741731897245584
   },
   "october_baseline": {
     "mae": 231.30495570141687,
     "rmse": 683.8653433130296,
     "mape_pct": 10.927255954373813,
+    "within_10pct_pct": 66.96888522563363,
     "r2": 0.7998395899450672
   },
+  "revision": {
+    "original_october": {
+      "mae": 100.25994774545248,
+      "rmse": 645.7634315509779,
+      "mape_pct": 4.697319078846455,
+      "within_10pct_pct": 98.33092932206883,
+      "r2": 0.8215223300207258
+    },
+    "mae_reduction_pct": 0.969407340344941,
+    "paired_mae_improvement_day_bootstrap_95pct": [
+      0.066238239984044,
+      1.9332599562633315
+    ],
+    "october_previously_inspected": true
+  },
   "october_mae_day_bootstrap_95pct": [
-    84.69471691888641,
-    116.35645350579978
+    84.13646713488495,
+    115.09201889264897
   ],
   "october_two_month_horizon": {
-    "mae": 99.11592929419461,
-    "rmse": 647.3990374513256,
-    "mape_pct": 4.64646532072823,
-    "r2": 0.820617079565578
+    "mae": 97.23673711078236,
+    "rmse": 646.7392993247943,
+    "mape_pct": 4.548456364012712,
+    "within_10pct_pct": 98.35153513290747,
+    "r2": 0.8209824970108822
   },
   "final_fit_rows": 48000,
   "output_rows": {
@@ -44,7 +63,7 @@
     "december": 31
   },
   "december_range": [
-    824.078003684866,
-    842.1048855275025
+    822.1811530120888,
+    841.9728740807399
   ]
 }

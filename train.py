@@ -16,9 +16,10 @@ from evaluation import (
     day_bootstrap_interval,
     error_slices,
     metrics,
+    paired_mae_interval,
     split_before,
 )
-from freight_model import ITERATIONS, SEED, TreeRateModel, validate_features
+from freight_model import SEED, ResidualRateModel, TreeRateModel, validate_features
 from predict import validate_ids, write_predictions
 
 
@@ -43,8 +44,9 @@ def load_inputs(data_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def evaluate_holdout(train, holdout, output_dir: Path) -> dict:
-    model = TreeRateModel().fit(train)
+    model = ResidualRateModel().fit(train)
     predictions = model.predict(holdout)
+    original = TreeRateModel().fit(train).predict(holdout)
     medians = (train.posted_rate / train.distance).groupby(train.equipment).median()
     baseline = holdout.distance * holdout.equipment.map(medians)
     residuals = holdout[
@@ -52,6 +54,7 @@ def evaluate_holdout(train, holdout, output_dir: Path) -> dict:
     ].copy()
     residuals["predicted_rate"] = predictions
     residuals["baseline_rate"] = np.asarray(baseline)
+    residuals["original_model_rate"] = original
     residuals["absolute_error"] = np.abs(residuals.posted_rate - predictions)
     residuals.to_csv(output_dir / "october_holdout_predictions.csv", index=False)
     error_slices(residuals).to_csv(output_dir / "october_slices.csv", index=False)
@@ -63,9 +66,10 @@ def evaluate_holdout(train, holdout, output_dir: Path) -> dict:
     )
     return {
         "selection": {
-            "criterion": "lowest August-September MAE",
-            "model": "tree_core",
-            "iterations": ITERATIONS,
+            "criterion": "lowest mean MAE across June-July and August-September",
+            "model": "residual_4",
+            "iterations": model.iterations,
+            "depth": model.parameters["depth"],
             "seed": SEED,
         },
         "split": {
@@ -83,6 +87,21 @@ def evaluate_holdout(train, holdout, output_dir: Path) -> dict:
             "largest_1pct_errors_share_squared_error": tail_share,
         },
         "october_baseline": metrics(holdout.posted_rate, baseline),
+        "revision": {
+            "original_october": metrics(holdout.posted_rate, original),
+            "mae_reduction_pct": float(
+                100
+                * (
+                    1
+                    - np.abs(holdout.posted_rate - predictions).mean()
+                    / np.abs(holdout.posted_rate - original).mean()
+                )
+            ),
+            "paired_mae_improvement_day_bootstrap_95pct": paired_mae_interval(
+                holdout, original, predictions
+            ),
+            "october_previously_inspected": True,
+        },
         "october_mae_day_bootstrap_95pct": day_bootstrap_interval(holdout, predictions),
     }
 
@@ -107,13 +126,13 @@ def main():
 
     print("Checking the two-month forecast horizon...", flush=True)
     earlier, _ = split_before(train, "2025-09-01")
-    stress = TreeRateModel().fit(earlier)
+    stress = ResidualRateModel().fit(earlier)
     summary["october_two_month_horizon"] = metrics(
         holdout.posted_rate, stress.predict(holdout)
     )
 
     print(f"Refitting on all {len(data):,} labeled loads...", flush=True)
-    model = TreeRateModel().fit(data)
+    model = ResidualRateModel().fit(data)
     joblib.dump(model, model_dir / "freight.joblib")
     importance = pd.Series(
         model.model.feature_importances_, index=model.model.feature_names_

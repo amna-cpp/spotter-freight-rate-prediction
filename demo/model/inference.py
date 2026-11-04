@@ -13,6 +13,31 @@ METADATA = json.loads(Path(__file__).with_name("metadata.json").read_text())
 catboost_model.float_feature_borders = METADATA["float_feature_borders"]
 
 
+def baseline_rate(features, distance):
+    model = METADATA.get("baseline")
+    if model is None:
+        return 0.0
+    categories = {
+        **features,
+        "pickup_equipment": features["pickup"] + ":" + features["equipment"],
+        "delivery_equipment": features["delivery"] + ":" + features["equipment"],
+    }
+    numeric = {
+        "distance": distance / 1000,
+        "log_distance": math.log(distance / 1000),
+        "inverse_distance": 1000 / distance,
+        "weight": (features["weight"] - 32000) / 10000,
+        "weight_invalid": features["weight_invalid"],
+    }
+    value = model["intercept"]
+    value += sum(
+        weights.get(categories[name], 0)
+        for name, weights in model["categories"].items()
+    )
+    value += sum(weight * numeric[name] for name, weight in model["numeric"].items())
+    return max(1.0, value * distance)
+
+
 def estimate(payload: dict) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Send one load as a JSON object.")
@@ -77,7 +102,7 @@ def estimate(payload: dict) -> dict:
         ],
         [features[name] for name in METADATA["categorical_features"]],
     )
-    rate = max(1.0, rate_per_mile * distance)
+    rate = max(1.0, baseline_rate(features, distance) + rate_per_mile * distance)
     return {
         "predicted_rate": round(rate, 2),
         "rate_per_mile": round(rate / distance, 2),

@@ -28,7 +28,7 @@ PALE = colors.HexColor("#EDF4F4")
 
 def main():
     result = json.loads((ROOT / "results/metrics.json").read_text())
-    comparison = pd.read_csv(ROOT / "results/development_comparison.csv")
+    comparison = pd.read_csv(ROOT / "results/tuning_comparison.csv")
     top = pd.read_csv(ROOT / "results/feature_importance.csv").head(10).iloc[::-1]
     target = ROOT / "output/pdf/freight_rate_report.pdf"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -36,7 +36,9 @@ def main():
     temp.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(7.1, 2.3), dpi=180)
     ax.barh(top.feature, top.importance, color="#087C88", height=0.65)
-    ax.set_xlabel("CatBoost prediction-change importance (relative units)", fontsize=9)
+    ax.set_xlabel(
+        "Residual-tree prediction-change importance (relative units)", fontsize=9
+    )
     ax.tick_params(labelsize=8)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="x", alpha=0.15)
@@ -98,8 +100,8 @@ def main():
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
             ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LINEBELOW", (0, -1), (-1, -1), 0.5, colors.HexColor("#CCDADB")),
         ]
         if header:
@@ -134,13 +136,14 @@ def main():
     para(
         "The final inputs cover November-December 2025, after the January-October labeled data. "
         "I therefore validated forward in time, keeping every date in one partition. "
-        "Model selection used pooled dollar MAE across two future months."
+        "The revision selects by mean dollar MAE across two pre-October forecast windows."
     )
     table(
         [
             ["Purpose", "Fit period / rows", "Evaluate or predict / rows"],
-            ["Choose model", "Jan-Jul / 33,718", "Aug-Sep / 9,429"],
-            ["Locked evaluation", "Jan-Sep / 43,147", "October / 4,853"],
+            ["Earlier comparison", "Jan-May / 24,023", "Jun-Jul / 9,695"],
+            ["Later comparison", "Jan-Jul / 33,718", "Aug-Sep / 9,429"],
+            ["Fixed-model check", "Jan-Sep / 43,147", "October / 4,853"],
             ["Two-month stress check", "Jan-Aug / 38,477", "October / 4,853"],
             ["Final fit", "Jan-Oct / 48,000", "Nov-Dec / 12,000; fixed chart / 31"],
         ],
@@ -148,27 +151,41 @@ def main():
     )
     para("Candidate comparison", "Section")
     names = {
-        "distance_equipment_median": "Equipment x distance baseline",
-        "quote_times_distance": "Quote signal x distance",
-        "additive_1": "Huber additive, one annual harmonic",
-        "additive_2": "Huber additive, two annual harmonics",
-        "tree_core": "CatBoost, core inputs (selected)",
-        "tree_market": "CatBoost + market index",
-        "tree_quote": "CatBoost + market index + quote",
+        "original": "Original CatBoost",
+        "shallow": "CatBoost, depth 4 / faster learning",
+        "medium": "CatBoost, depth 5 / faster learning",
+        "residual_4": "Smooth baseline + depth-4 trees (selected)",
+        "residual_6": "Smooth baseline + depth-6 trees",
     }
-    rows = [["January-July fit; August-September evaluation", "MAE ($)", "RMSE ($)"]]
-    for _, r in comparison[comparison.period.eq("all")].iterrows():
-        rows.append([names[r.model], f"{r.mae:,.2f}", f"{r.rmse:,.2f}"])
-    table(rows, [328, 88, 88])
+    rows = [["Model / dollar MAE", "Jun-Jul", "Aug-Sep", "Mean"]]
+    for name, group in comparison.groupby("model", sort=False):
+        values = group.sort_values("check_start").mae.tolist()
+        rows.append(
+            [names[name], *[f"{v:,.2f}" for v in values], f"{sum(values) / 2:,.2f}"]
+        )
+    table(rows, [258, 82, 82, 82])
     para(
-        "All CatBoost ablations share fixed settings. The winner then evaluated October without "
-        "retuning: RMSE $%.2f, R2 %.3f. The day-block bootstrap 95%% MAE interval is $%.2f-$%.2f "
-        "(2,000 resamples; conditional on this month). Initial descriptive EDA summarized the full "
-        "labeled file, so October was held out from model selection and fitting rather than fully blinded."
+        "Each preprocessing fit uses only that window's training rows. The chosen revision gives "
+        "October RMSE $%.2f and R2 %.3f. The day-block bootstrap 95%% MAE interval is $%.2f-$%.2f "
+        "(2,000 resamples; conditional on this month). October was inspected in the original assessment; "
+        "revision selection uses only earlier months. This is a reused chronological check, not a fresh blind test."
         % (m["rmse"], m["r2"], *result["october_mae_day_bootstrap_95pct"]),
         "SmallCopy",
     )
     para("Error behavior", "Section")
+    revision = result["revision"]
+    para(
+        "The original model's October MAE was $%.2f; the revision reduces it by %.2f%%. "
+        "The paired day-bootstrap 95%% interval for the MAE improvement is $%.2f-$%.2f. "
+        "%.2f%% of October predictions are within 10%% of the actual price. This is a tolerance-based "
+        "success rate, not classification accuracy."
+        % (
+            revision["original_october"]["mae"],
+            revision["mae_reduction_pct"],
+            *revision["paired_mae_improvement_day_bootstrap_95pct"],
+            m["within_10pct_pct"],
+        )
+    )
     para(
         "October median absolute error is $%.2f and its 95th percentile is $%.2f. "
         "The largest 1%% of absolute residuals account for %.1f%% of squared error. "
@@ -227,10 +244,11 @@ def main():
     )
     para("Estimator and feature engineering", "Section")
     para(
-        "CatBoost predicts rate per mile with MAE loss and distance-proportional weights. "
-        "For positive distance, weighted absolute error in rate per mile equals dollar absolute "
-        "error up to a fixed scale. The output is multiplied by distance and floored at $1. "
-        "Settings: 1,600 iterations, depth 6, learning rate 0.045, L2 8, seed 42, four CPU threads."
+        "A regularized Huber additive model first learns smooth distance/weight effects and city, "
+        "equipment and weekday effects, without annual harmonics. CatBoost then predicts its signed "
+        "remaining error per mile. Distance-proportional weights align this loss with dollar MAE. "
+        "The correction is added to the baseline and the total is floored at $1. "
+        "Tree settings: 2,400 iterations, depth 4, learning rate 0.045, L2 8, seed 42, four CPU threads."
     )
     para(
         "Features include directional city/lane categories, equipment, cleaned weight and its flag, "
@@ -242,7 +260,7 @@ def main():
     )
     story.append(Image(str(importance_path), width=504, height=163))
     para(
-        "Final-refit feature importance is descriptive, not causal and not a separate test. "
+        "Importance describes only the residual trees, not the additive component or causal effects. "
         "Correlated calendar/location features can share importance.",
         "SmallCopy",
     )
@@ -270,10 +288,10 @@ def main():
     para("Reproduction and output integrity", "Section")
     para(
         "The repository includes source, input setup instructions, the original scorer, requirements and an exact "
-        "environment lock. Raw assessment datasets stay local. <b>experiment.py</b> recreates selection; <b>train.py</b> evaluates the locked "
+        "environment lock. Raw assessment datasets stay local. <b>tune.py</b> recreates revision selection; <b>train.py</b> evaluates the fixed "
         "model, saves diagnostics and refits; <b>predict.py</b> matches predictions to template IDs. "
         "It preserves December input columns and validates one-to-one ID coverage and finite positive rates. "
-        "Both CSV outputs are written to cents. Ten portable contract tests and the original scorer pass."
+        "Both CSV outputs are written to cents. Portable contract and model-export tests check the workflow."
     )
     table(
         [

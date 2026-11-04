@@ -1,0 +1,13 @@
+{
+  "criterion": "lowest mean MAE across June-July and August-September",
+  "model": "residual_4",
+  "mean_window_mae": {
+    "residual_4": 104.37028717184583,
+    "residual_6": 109.22707103159868,
+    "original": 109.7274595893877,
+    "shallow": 110.31672646713598,
+    "medium": 110.7794455917045
+  },
+  "selection_latest_date": "2025-09-30",
+  "october_used_for_selection": false
+}

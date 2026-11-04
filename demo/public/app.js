@@ -31,6 +31,7 @@ const presets = {
 };
 let study;
 let requestNumber = 0;
+let chartScale;
 
 function applyPreset(load) {
   for (const [key, value] of Object.entries(load))
@@ -83,11 +84,16 @@ async function predict(event) {
 
 function drawChart() {
   const rows = study.december;
+  const values = rows.map((row) => row.predicted_rate);
+  const step = Math.max(5, Math.ceil((Math.max(...values) - Math.min(...values)) / 15) * 5);
+  const low = Math.floor(Math.min(...values) / step) * step - step;
+  const high = Math.ceil(Math.max(...values) / step) * step + step;
+  chartScale = (value) => 154 - ((value - low) / (high - low)) * 127;
   const x = (index) => 44 + index * (588 / 30);
-  const y = (value) => 154 - ((value - 820) / 30) * 127;
+  const y = chartScale;
   let content =
     "<title>Fixed-load December predictions</title><desc>Daily estimates from the submitted model, with only the pickup date changing.</desc>";
-  for (const value of [820, 830, 840, 850]) {
+  for (let value = low; value <= high; value += step) {
     content += `<line x1="44" y1="${y(value)}" x2="632" y2="${y(value)}" stroke="#dedfd3" stroke-width="1"/><text class="chart-label" x="0" y="${y(value) + 4}">$${value}</text>`;
   }
   for (const day of [1, 8, 15, 22, 31])
@@ -107,7 +113,7 @@ function selectDay() {
   const index = Number($("#chart-day").value) - 1;
   const row = study.december[index];
   const x = 44 + index * (588 / 30);
-  const y = 154 - ((row.predicted_rate - 820) / 30) * 127;
+  const y = chartScale(row.predicted_rate);
   $("#selected-line").setAttribute("x1", x);
   $("#selected-line").setAttribute("x2", x);
   $("#selected-point").setAttribute("cx", x);
@@ -126,6 +132,18 @@ async function start() {
     const response = await fetch("/data.json");
     if (!response.ok) throw new Error("Could not load the study.");
     study = await response.json();
+    const result = study.metrics.october;
+    const baseline = study.metrics.october_baseline;
+    $("#baseline-mae").textContent = currency.format(baseline.mae);
+    $("#selected-mae").textContent = currency.format(result.mae);
+    $("#context-mae").textContent = currency.format(result.mae);
+    $("#mae-improvement").textContent =
+      `${(100 * (1 - result.mae / baseline.mae)).toFixed(1)}% lower MAE on the same October loads.`;
+    $("#within-tolerance").textContent =
+      `${result.within_10pct_pct.toFixed(2)}% of predictions within 10% of the actual price.`;
+    $("#metric-mape").textContent = `${result.mape_pct.toFixed(2)}%`;
+    $("#metric-rmse").textContent = currency.format(result.rmse);
+    $("#metric-r2").textContent = result.r2.toFixed(3);
     for (const id of ["pickup", "delivery"]) {
       const select = $(`#${id}`);
       select.replaceChildren(

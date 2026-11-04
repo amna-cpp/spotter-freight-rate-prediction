@@ -3,45 +3,45 @@
     "load": {
       "pickup": "Lexington",
       "delivery": "Fort Wayne",
-      "distance": 1134.749999,
+      "distance": 1040.249999,
       "equipment": "Dry Van",
       "weight": 32000,
       "date": "2025-12-04"
     },
-    "predicted_rate": 2295.89
+    "predicted_rate": 2095.21
   },
   {
     "load": {
       "pickup": "Lexington",
       "delivery": "Fort Wayne",
-      "distance": 1134.750001,
+      "distance": 1040.250001,
       "equipment": "Dry Van",
       "weight": 32000,
       "date": "2025-12-04"
     },
-    "predicted_rate": 2295.89
+    "predicted_rate": 2095.21
   },
   {
     "load": {
       "pickup": "Lexington",
       "delivery": "Fort Wayne",
-      "distance": 1144.749999,
+      "distance": 1064.64990134375,
       "equipment": "Dry Van",
       "weight": 32000,
       "date": "2025-12-04"
     },
-    "predicted_rate": 2316.08
+    "predicted_rate": 2138.16
   },
   {
     "load": {
       "pickup": "Lexington",
       "delivery": "Fort Wayne",
-      "distance": 1144.750001,
+      "distance": 1064.64990334375,
       "equipment": "Dry Van",
       "weight": 32000,
       "date": "2025-12-04"
     },
-    "predicted_rate": 2316.08
+    "predicted_rate": 2138.16
   },
   {
     "load": {
@@ -49,10 +49,10 @@
       "delivery": "Fort Wayne",
       "distance": 360,
       "equipment": "Dry Van",
-      "weight": 31442.749999,
+      "weight": 31294.499999,
       "date": "2025-12-04"
     },
-    "predicted_rate": 840.67
+    "predicted_rate": 838.36
   },
   {
     "load": {
@@ -60,10 +60,10 @@
       "delivery": "Fort Wayne",
       "distance": 360,
       "equipment": "Dry Van",
-      "weight": 31442.750001,
+      "weight": 31294.500001,
       "date": "2025-12-04"
     },
-    "predicted_rate": 840.67
+    "predicted_rate": 838.36
   },
   {
     "load": {
@@ -71,10 +71,10 @@
       "delivery": "Fort Wayne",
       "distance": 360,
       "equipment": "Dry Van",
-      "weight": 31524.499999,
+      "weight": 31442.249999,
       "date": "2025-12-04"
     },
-    "predicted_rate": 840.67
+    "predicted_rate": 838.74
   },
   {
     "load": {
@@ -82,9 +82,9 @@
       "delivery": "Fort Wayne",
       "distance": 360,
       "equipment": "Dry Van",
-      "weight": 31524.500001,
+      "weight": 31442.250001,
       "date": "2025-12-04"
     },
-    "predicted_rate": 840.67
+    "predicted_rate": 838.74
   }
 ]

@@ -10,6 +10,24 @@ from catboost import Pool
 ROOT = Path(__file__).resolve().parent
 
 
+def export_baseline(baseline, training):
+    categories, numeric = baseline._raw(training)
+    coefficients = baseline.model.coef_
+    result = {"categories": {}}
+    offset = 0
+    for name, levels in zip(categories, baseline.encoder.categories_, strict=True):
+        result["categories"][name] = dict(
+            zip(levels, coefficients[offset : offset + len(levels)], strict=True)
+        )
+        offset += len(levels)
+    weights = coefficients[offset:] / baseline.scaler.scale_
+    result["numeric"] = dict(zip(numeric, weights, strict=True))
+    result["intercept"] = float(
+        baseline.model.intercept_ - baseline.scaler.mean_ @ weights
+    )
+    return result
+
+
 def main():
     model = joblib.load(ROOT / "models/freight.joblib")
     training = pd.read_csv(ROOT / "data/train_test.csv")
@@ -30,6 +48,8 @@ def main():
         model.model.get_borders()[model.model.feature_names_.index(name)]
         for name in metadata["numeric_features"]
     ]
+    if hasattr(model, "baseline"):
+        metadata["baseline"] = export_baseline(model.baseline, training)
     (output / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     cases = []
     base = {
