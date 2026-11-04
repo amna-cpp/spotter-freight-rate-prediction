@@ -45,8 +45,12 @@ assets are in `public/`; `api/predict.py` is the prediction endpoint. The Python
 version and function configuration are included.
 
 ```bash
-vercel --cwd demo --prod
+vercel link --cwd demo --project spotter-rate-desk --yes
+vercel --cwd demo --prod --archive=tgz
 ```
+
+The upload excludes Python caches and local environment files. The archive keeps
+the generated model upload small without changing its predictions.
 
 The original training workflow and submission artifacts remain in the repository
 root. This demo does not change the selected model or its prediction files.

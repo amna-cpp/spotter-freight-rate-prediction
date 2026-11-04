@@ -1,5 +1,6 @@
-.vercel
-__pycache__
-**/__pycache__
-serve.py
+**/__pycache__/**
+**/*.pyc
+.env*
+.vercel/
 README.md
+serve.py
