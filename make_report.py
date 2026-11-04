@@ -114,7 +114,7 @@ def main():
 
     para("Freight rate prediction", "ReportTitle")
     para(
-        "Chronological validation, robust modeling and a reproducible submission<br/>Amna Hameed | Machine Learning Engineer assessment",
+        "Model, validation and December forecast<br/>Amna Hameed",
         "Deck",
     )
     m = result["october"]
@@ -202,7 +202,7 @@ def main():
 
     story.append(PageBreak())
     para("Data quality and model", "ReportTitle")
-    para("Train-only cleaning and a stable input contract", "Deck")
+    para("Input checks, missing weights and model features", "Deck")
     table(
         [
             ["Issue", "Labeled data", "Final prediction data", "Treatment"],
@@ -285,7 +285,7 @@ def main():
         % tuple(result["december_range"]),
         "SmallCopy",
     )
-    para("Reproduction and output integrity", "Section")
+    para("Run instructions and output checks", "Section")
     para(
         "The repository includes source, input setup instructions, the original scorer, requirements and an exact "
         "environment lock. Raw assessment datasets stay local. <b>tune.py</b> recreates revision selection; <b>train.py</b> evaluates the fixed "
@@ -309,12 +309,6 @@ def main():
         "Repeat cities and lanes are allowed across time splits, matching the forecasting use case. "
         "About 12.2% of final directional lanes were unseen in training; unseen-city or new-year "
         "performance was not validated. Monitor future dollar error and drift once new labels arrive."
-    )
-    para(
-        "Submission: repository, validation_predictions.csv, this report, and a candidate-recorded "
-        "2-3 minute camera-on Loom. A timed walkthrough guide is included; the actual recording is a "
-        "remaining candidate action.",
-        "SmallCopy",
     )
 
     def footer(canvas, doc):

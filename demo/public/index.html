@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f3f1e9" />
     <meta
       name="description"
-      content="Try a freight-rate model and see how it was validated. A working assessment demo by Amna Hameed."
+      content="Freight price estimates and model validation by Amna Hameed."
     />
     <title>Rate desk — Freight rate study</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -21,7 +21,7 @@
         desk<span class="edition">A freight rate study</span></a
       >
       <nav aria-label="Main navigation">
-        <a href="#method">The approach</a>
+        <a href="#method">Validation</a>
         <a
           href="https://github.com/amna-cpp/spotter-freight-rate-prediction"
           target="_blank"
@@ -213,8 +213,8 @@
       <section class="method" id="method" aria-labelledby="method-title">
         <div class="method-heading">
           <div>
-            <p class="eyebrow">02 / The work behind it</p>
-            <h2 id="method-title">Checked against the future.</h2>
+            <p class="eyebrow">02 / Validation</p>
+            <h2 id="method-title">Validation results.</h2>
           </div>
           <p class="method-intro">
             The final loads come after the training period.<br />Validation
@@ -285,7 +285,7 @@
         </div>
         <div class="details-row">
           <details>
-            <summary>What goes into the model?</summary>
+            <summary>Model inputs</summary>
             <p>
               Pickup, delivery, distance, equipment, weight, and date. The model
               first fits smooth pricing effects, then CatBoost learns their
@@ -296,7 +296,7 @@
             </p>
           </details>
           <details>
-            <summary>What should I keep in mind?</summary>
+            <summary>Limitations</summary>
             <p>
               There are ten labeled months from one year. This curve cannot
               establish December holiday peaks or future market shocks. The
@@ -329,7 +329,7 @@
     </main>
     <footer class="wrap footer">
       <p>Built by Amna Hameed</p>
-      <p>Freight rate assessment · Historical 2025 model</p>
+      <p>Freight rates · 2025 study</p>
       <a
         href="https://github.com/amna-cpp/spotter-freight-rate-prediction"
         target="_blank"

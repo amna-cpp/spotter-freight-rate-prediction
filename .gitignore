@@ -12,3 +12,4 @@ results/october_holdout_predictions.csv
 .ruff_cache/
 .vercel/
 output/demo/
+local/
